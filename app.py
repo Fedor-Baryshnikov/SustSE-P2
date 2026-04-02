@@ -1,11 +1,12 @@
 import os
+import sys
 from fastapi import FastAPI, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import uvicorn
-from utils import load_all_chats, get_chat, save_chat, generate_ai_response, get_stats
+from utils import load_all_chats, get_chat, save_chat, generate_ai_response, get_stats, set_models, verif_models
 
 MM_INSTRUCTION_PROMPT = """
     You are the control LLM. 
@@ -87,4 +88,12 @@ async def stats():
     return get_stats()
 
 if __name__ == "__main__":
+
+    if len(sys.argv) > 1:
+        energibridge = sys.argv[1]
+
+        if len(sys.argv) == 4:
+            if verif_models(sys.argv[2], sys.argv[3]):
+                set_models(*sys.argv)
+
     uvicorn.run("app:app", host="0.0.0.0", port=5010, reload=True)
