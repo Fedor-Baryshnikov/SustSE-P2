@@ -1,0 +1,35 @@
+Okay, here's a detailed implementation guide for a junior developer, outlining the steps to build the FastAPI task management API.
+
+**1. Project Setup & Dependencies:**
+
+*   Create a project directory.
+*   Initialize a virtual environment (`python -m venv .venv`).
+*   Install dependencies: `pip install fastapi uvicorn SQLAlchemy databases python-dotenv pydantic`.
+
+**2. Database Setup:**
+
+*   Create a `models.py` file. Define a `Base` SQLAlchemy class. Define the `Task` model inheriting from `Base`, with fields: `id` (Integer, primary key), `title` (String), `description` (String), `completed` (Boolean), `created_at` (DateTime).
+*   Create a `database.py` file.  Establish a SQLAlchemy engine connection to a SQLite database file (e.g., `tasks.db`).  Create all tables using `Base.metadata.create_all(engine)`.
+
+**3. FastAPI Application & Pydantic Models:**
+
+*   Create `main.py`.
+*   Import FastAPI, SQLAlchemy, Pydantic, and database components.
+*   Define a Pydantic model for creating/updating tasks (e.g., `TaskCreate`, `TaskUpdate`).  Use these to validate request data.
+
+**4. API Endpoints:**
+
+*   Implement the following FastAPI endpoints using route decorators (e.g., `@app.post("/tasks")`).
+    *   **Create:**  Takes `TaskCreate` model as input, adds a new task to the database, returns the created task.
+    *   **Read (Single):** Takes task ID, queries the database, returns the task.  Implement 404 error handling if not found.
+    *   **Read (All):** Returns a list of all tasks.
+    *   **Update:** Takes task ID and `TaskUpdate` model, updates the task.  Implement 404 handling.
+    *   **Delete:** Takes task ID, deletes the task.  Implement 404 handling.
+
+**5. Running the Application:**
+
+*   Use Uvicorn to run the FastAPI application: `uvicorn main:app --reload`.
+
+
+
+Remember to structure your code modularly and add docstrings to your functions.

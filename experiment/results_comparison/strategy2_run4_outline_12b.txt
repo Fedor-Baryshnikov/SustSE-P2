@@ -1,0 +1,36 @@
+Okay, here's a detailed implementation guide for a junior developer to build the FastAPI task management system, broken down into steps:
+
+**1. Project Setup & Dependencies:**
+
+*   Create a project directory.
+*   Initialize a virtual environment (`python -m venv venv`).
+*   Install dependencies: `pip install fastapi uvicorn sqlalchemy databases python-sqlite3 pydantic`.
+
+**2. Database Model (models.py):**
+
+*   Define a `Base` SQLAlchemy class (for declarative base).
+*   Define the `Task` model using SQLAlchemy:
+    *   `id`: Integer, primary key, auto-incrementing.
+    *   `title`: String (255), not nullable.
+    *   `description`: String (text), nullable.
+    *   `completed`: Boolean, default False.
+    *   `created_at`: DateTime, default `datetime.now()`.
+
+**3. Database Connection (db.py):**
+
+*   Create a database connection function using `databases` library. Use SQLite as the database engine.
+
+**4. Pydantic Models (schemas.py):**
+
+*   Define `TaskCreate`, `TaskUpdate`, and `TaskResponse` Pydantic models.  `TaskCreate` will define fields for creation, `TaskUpdate` for updates (subset of creation), and `TaskResponse` will define the response format.
+
+**5. FastAPI App (main.py):**
+
+*   Import necessary libraries.
+*   Initialize FastAPI app and SQLAlchemy `Session` factory.
+*   Define API endpoints:
+    *   `create_task`: POST, uses `TaskCreate` Pydantic model.
+    *   `read_task`: GET (by ID), handles 404 errors.
+    *   `update_task`: PUT (by ID), uses `TaskUpdate` model.
+    *   `delete_task`: DELETE (by ID).
+    *   `list_tasks`: GET (all tasks, optional pagination).

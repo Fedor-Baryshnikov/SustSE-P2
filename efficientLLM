@@ -1,0 +1,59 @@
+#!/bin/bash
+VENV=".venv";
+
+usage() {
+	echo "Usage: $0 [options]"
+	echo ""
+	echo "Optionally, you can select the two models you would like to use."
+	echo ""
+	echo "Options:"
+	echo "	-l <large model>"
+	echo "  -m <small model>"
+	echo ""
+	echo "Example: $0 -l gemma3:12b -s gemma3:4b"
+	exit 1;
+}
+
+if [ $# -ne 0 ] && [ $# -ne 4 ]; then
+	usage
+	exit 1;
+fi
+
+# Update permissions
+echo "Setting MSR permissions to run EnergiBridge without sudo";
+sudo chgrp -R msr /dev/cpu/*/msr
+sudo chmod g+r /dev/cpu/*/msr
+
+# In case the venv has been removed, it is setup again correctly
+if ! [ -d "${VENV}" ]; then
+	python3 -m venv .venv;
+	source ./.venv/bin/activate;
+	pip3 install -r setup/requirements.txt
+fi
+
+if ! command -v energibridge >/dev/null 2>&1; then
+	echo "Make sure energibridge is installed.";
+	exit 1;
+fi
+
+ENERGIBRIDGE=$(command -v energibridge);
+PROJECT_DIR=$(pwd);
+
+source $PROJECT_DIR/.venv/bin/activate;
+
+SMALL_LLM="default";
+LARGE_LLM="default";
+
+if [ $# == 0 ]; then
+	$PROJECT_DIR/.venv/bin/python3 app.py $ENERGIBRIDGE
+else
+	if [ $1 == "-l" ] && [ $3 == "-s" ]; then
+		SMALL_LLM=$4;
+		LARGE_LLM=$2;
+	elif [ $1 == "-s" ] && [ $3 == "-l" ]; then
+		SMALL_LLM=$2;
+		LARGE_LLM=$4;
+
+	$PROJECT_DIR/.venv/bin/python3 app.py $ENERGIBRIDGE $LARGE_LLM $SMALL_LLM
+	fi
+fi

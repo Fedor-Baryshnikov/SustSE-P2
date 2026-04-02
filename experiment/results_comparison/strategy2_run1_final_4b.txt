@@ -1,0 +1,115 @@
+```python
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.ext.declarative import declarative_base, declarative_base
+from sqlalchemy.orm import sessionmaker, Session
+from datetime import datetime
+from typing import List
+
+from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+
+app = FastAPI()
+
+# 1. Project Setup (already done)
+
+# 2. Define the Task Model (models.py)
+Base = declarative_base()
+
+class Task(Base):
+    __tablename__ = "tasks"
+    id = Column(Integer, primary_key=True)
+    title = Column(String)
+    description = Column(String)
+    completed = Column(Boolean)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# 3. Database Setup (db.py)
+engine = create_engine("sqlite:///./tasks.db")
+SessionLocal = sessionmaker(bind=engine)
+db = SessionLocal()
+
+# 4. FastAPI Application (main.py)
+# Pydantic Models
+class TaskCreate(BaseModel):
+    title: str
+    description: str
+    completed: bool = False
+
+class TaskUpdate(BaseModel):
+    title: str = None
+    description: str = None
+    completed: bool = None
+
+class TaskResponse(BaseModel):
+    id: int
+    title: str
+    description: str
+    completed: bool
+    created_at: datetime
+
+    def json(self):
+        return {
+            "id": self.id,
+            "title": self.title,
+            "description": self.description,
+            "completed": self.completed,
+            "created_at": self.created_at.isoformat()
+        }
+
+
+# FastAPI Endpoints
+@app.post("/tasks/", response_model=TaskResponse)
+async def create_task(task: TaskCreate):
+    new_task = Task(title=task.title, description=task.description, completed=task.completed)
+    db.add(new_task)
+    db.commit()
+    return TaskResponse(id=new_task.id, title=new_task.title, description=new_task.description, completed=new_task.completed, created_at=new_task.created_at)
+
+
+@app.get("/tasks/{task_id}", response_model=TaskResponse)
+async def read_task(task_id: int):
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return TaskResponse(id=task.id, title=task.title, description=task.description, completed=task.completed, created_at=task.created_at)
+
+
+@app.put("/tasks/{task_id}", response_model=TaskResponse)
+async def update_task(task_id: int, task_update: TaskUpdate):
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task_update.title is not None:
+        task.title = task_update.title
+    if task_update.description is not None:
+        task.description = task_update.description
+    if task_update.completed is not None:
+        task.completed = task_update.completed
+
+    db.commit()
+    return TaskResponse(id=task.id, title=task.title, description=task.description, completed=task.completed, created_at=task.created_at)
+
+
+@app.delete("/tasks/{task_id}")
+async def delete_task(task_id: int):
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    db.delete(task)
+    db.commit()
+
+
+@app.get("/tasks/", response_model=List[TaskResponse])
+async def list_tasks():
+    tasks = db.query(Task).all()
+    return [TaskResponse(id=task.id, title=task.title, description=task.description, completed=task.completed, created_at=task.created_at) for task in tasks]
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+```

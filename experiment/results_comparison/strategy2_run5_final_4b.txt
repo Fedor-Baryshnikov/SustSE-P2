@@ -1,0 +1,123 @@
+```python
+from datetime import datetime
+from typing import List
+
+import databases
+import sqlalchemy
+from fastapi import FastAPI, HTTPException, Depends
+from pydantic import BaseModel, Field
+from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+# 1. Project Setup & Dependencies (Implicit through dependencies)
+
+# 2. Database Setup
+Base = declarative_base()
+
+class Task(Base):
+    __tablename__ = 'tasks'
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, Field(min_length=3, max_length=100))
+    description = Column(String, Field(min_length=3, max_length=500))
+    completed = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<Task(id={self.id}, title='{self.title}')>"
+
+
+def create_db_engine():
+    db_url = os.getenv("DATABASE_URL")
+    if db_url is None:
+        raise ValueError("DATABASE_URL environment variable not set.")
+    engine = sqlalchemy.create_engine(db_url, echo=False)
+    return engine
+
+def create_db_session(engine):
+    db = databases.Database(engine)
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    return db, SessionLocal
+
+# 3. FastAPI Application & Pydantic Models
+app = FastAPI()
+
+class TaskCreate(BaseModel):
+    title: str = Field(min_length=3, max_length=100)
+    description: str = Field(min_length=3, max_length=500)
+
+    class Config:
+        orm_mode = True
+
+
+class TaskUpdate(BaseModel):
+    title: str = Field(max_length=100, default=None)
+    description: str = Field(max_length=500, default=None)
+    completed: bool = Field(default=None)
+
+
+# 4. API Endpoints
+
+@app.post("/tasks", response_model=TaskCreate)
+async def create_task(task: TaskCreate):
+    db, session = create_db_session(create_db_engine())
+    new_task = Task(**task.dict())
+    session.add(new_task)
+    session.commit()
+    session.refresh(new_task)
+    return new_task
+
+@app.get("/tasks/{task_id}", response_model=Task)
+async def read_task(task_id: int):
+    db, session = create_db_session(create_db_engine())
+    session = sessionmaker(bind=create_db_engine())(sessionmaker)
+    task = session.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return task
+
+@app.get("/tasks", response_model=List[Task])
+async def read_all_tasks():
+    db, session = create_db_session(create_db_engine())
+    tasks = session.query(Task).all()
+    return tasks
+
+@app.put("/tasks/{task_id}", response_model=Task)
+async def update_task(task_id: int, task_update: TaskUpdate):
+    db, session = create_db_session(create_db_engine())
+    session = sessionmaker(bind=create_db_engine())(sessionmaker)
+    task = session.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task_update.title:
+        task.title = task_update.title
+    if task_update.description:
+        task.description = task_update.description
+    if task_update.completed is not None:
+        task.completed = task_update.completed
+    
+    session.commit()
+    session.refresh(task)
+    return task
+
+@app.delete("/tasks/{task_id}", status_code=204)
+async def delete_task(task_id: int):
+    db, session = create_db_session(create_db_engine())
+    session = sessionmaker(bind=create_db_engine())(sessionmaker)
+    task = session.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    session.delete(task)
+    session.commit()
+    return None
+
+# 5. Running the Application
+# uvicorn main:app --reload
+```

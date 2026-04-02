@@ -1,0 +1,35 @@
+Okay, here's a detailed implementation guide for a junior developer to build the FastAPI task management API.
+
+**1. Project Setup:**
+
+*   **Create a Virtual Environment:** `python -m venv .venv; .venv\Scripts\activate`
+*   **Install Dependencies:** `pip install fastapi uvicorn sqlalchemy databases python-sqlite3 pydantic`
+
+**2. Define the Task Model (models.py):**
+
+*   Import `Base`, `Column`, `Integer`, `String`, `Boolean`, `DateTime` from `sqlalchemy`. `DeclarativeBase` from `sqlalchemy.orm`
+*   Create a `Base` class inheriting from `DeclarativeBase`.
+*   Define the `Task` class as a SQLAlchemy `Table` (not a class).  Fields: `id` (Integer, Primary Key), `title` (String), `description` (String), `completed` (Boolean), `created_at` (DateTime).
+
+**3. Database Setup (db.py):**
+
+*   Import `SQLAlchemy`, `create_engine`, `Session`.
+*   Define engine (e.g., `create_engine("sqlite:///./tasks.db")`).
+*   Create a `Session` object.
+
+**4. FastAPI Application (main.py):**
+
+*   Import FastAPI, SQLAlchemy, Pydantic models, and database session.
+*   Define a Pydantic `TaskCreate`, `TaskUpdate`, and `TaskResponse` model.
+*   Define FastAPI endpoints:
+    *   `create_task`: POST `/tasks`. Uses `TaskCreate` model.  Adds new task to DB.
+    *   `read_task`: GET `/tasks/{task_id}`. Uses `TaskResponse` model. Handles 404.
+    *   `update_task`: PUT `/tasks/{task_id}`. Uses `TaskUpdate` model. Handles 404.
+    *   `delete_task`: DELETE `/tasks/{task_id}`. Handles 404.
+    *   `list_tasks`: GET `/tasks`. Returns all tasks.
+
+**5. Run the Application:** `uvicorn main:app --reload`
+
+
+
+Remember to include proper error handling and logging.

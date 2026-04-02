@@ -1,0 +1,196 @@
+```python
+from typing import Optional
+
+from fastapi import FastAPI, HTTPException, Depends
+from pydantic import BaseModel
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
+from datetime import datetime
+
+app = FastAPI()
+
+# Database setup
+DATABASE_URL = "sqlite:///./task_management.db"  # Use an in-memory SQLite database
+engine = create_engine(DATABASE_URL)
+Base = declarative_base()
+
+
+class Task(Base):
+    __tablename__ = "tasks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(255), index=True)
+    description = Column(String(500), nullable=True)
+    completed = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.now)
+
+    def __repr__(self):
+        return f"<Task(id={self.id}, title='{self.title}', completed={self.completed})>"
+
+
+Base.metadata.create_all(engine)  # Create the database tables
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+class TaskCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+
+class TaskUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    completed: Optional[bool] = None
+
+
+class TaskResponse(BaseModel):
+    id: int
+    title: str
+    description: Optional[str] = None
+    completed: bool
+    created_at: datetime
+
+
+# CRUD operations
+
+# Create
+@app.post("/tasks/", response_model=TaskResponse)
+async def create_task(task: TaskCreate, db: Session = Depends(get_db)):
+    new_task = Task(title=task.title, description=task.description)
+    db.add(new_task)
+    db.commit()
+    db.refresh(new_task)  # Refresh to get the assigned ID
+    return TaskResponse(
+        id=new_task.id,
+        title=new_task.title,
+        description=new_task.description,
+        completed=new_task.completed,
+        created_at=new_task.created_at
+    )
+
+
+# Read (Retrieve all tasks)
+@app.get("/tasks/", response_model=list[TaskResponse])
+async def read_tasks(db: Session = Depends(get_db)):
+    tasks = db.query(Task).all()
+    return [
+        TaskResponse(
+            id=task.id,
+            title=task.title,
+            description=task.description,
+            completed=task.completed,
+            created_at=task.created_at
+        )
+        for task in tasks
+    ]
+
+
+# Read (Retrieve a single task)
+@app.get("/tasks/{task_id}", response_model=TaskResponse)
+async def read_task(task_id: int, db: Session = Depends(get_db)):
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return TaskResponse(
+        id=task.id,
+        title=task.title,
+        description=task.description,
+        completed=task.completed,
+        created_at=task.created_at
+    )
+
+
+# Update
+@app.put("/tasks/{task_id}", response_model=TaskResponse)
+async def update_task(task_id: int, task_update: TaskUpdate, db: Session = Depends(get_db)):
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task_update.title is not None:
+        task.title = task_update.title
+    if task_update.description is not None:
+        task.description = task_update.description
+    if task_update.completed is not None:
+        task.completed = task_update.completed
+
+    db.commit()
+    db.refresh(task)
+    return TaskResponse(
+        id=task.id,
+        title=task.title,
+        description=task.description,
+        completed=task.completed,
+        created_at=task.created_at
+    )
+
+
+# Delete
+@app.delete("/tasks/{task_id}")
+async def delete_task(task_id: int, db: Session = Depends(get_db)):
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    db.delete(task)
+    db.commit()
+    return {"message": "Task deleted"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+```
+
+Key improvements and explanations:
+
+* **Database Setup:** Uses SQLAlchemy to connect to a SQLite database (file: `task_management.db`). The `create_engine` function sets up the connection, and `Base.metadata.create_all(engine)` creates the `tasks` table if it doesn't exist.  The `SessionLocal` class is a factory for creating database sessions.
+* **Database Dependency:** Uses `Depends(get_db)` for database session management. This ensures that a new database session is created for each request, and the session is closed afterwards. This is crucial for proper database connection handling.
+* **Pydantic Models:**
+    * `TaskCreate`:  Defines the structure of the data expected when *creating* a new task.  `description` is optional.
+    * `TaskUpdate`: Defines the structure for updating a task. All fields are optional, allowing partial updates.
+    * `TaskResponse`: Defines the structure of the data returned when *reading* a task.  This promotes consistency.
+* **Error Handling:** Includes `HTTPException` with a `status_code=404` for cases where a task is not found.
+* **CRUD Operations:**
+    * **Create (POST /tasks/):** Creates a new task using the `TaskCreate` model.
+    * **Read (GET /tasks/):** Retrieves all tasks.  Returns a list of `TaskResponse` objects.
+    * **Read (GET /tasks/{task_id}):** Retrieves a single task by ID.
+    * **Update (PUT /tasks/{task_id}):** Updates an existing task using the `TaskUpdate` model.  Allows updating specific fields without affecting others.
+    * **Delete (DELETE /tasks/{task_id}):** Deletes a task by ID.
+* **Data Models:**
+    * Uses SQLAlchemy's `declarative_base` to define the `Task` model, mapping it to the `tasks` table in the database.
+    * Uses `__repr__` for better debugging and object representation.
+* **Clear Structure:** Separates the database setup, data models, and CRUD operations for improved readability and maintainability.
+* **Type Hinting:** Uses type hints for better code clarity and static analysis.
+* **Complete & Runnable:** This is a complete, runnable script that can be executed directly.
+* **`created_at` field**: Added a `created_at` field to the `Task` model and automatically populated it with the current date and time when a new task is created.
+* **`refresh` after commit**: Uses `db.refresh(new_task)` in the `create_task` function to update the object with the newly assigned primary key (`id`) after the commit.
+
+How to run:
+
+1. **Install Dependencies:**
+   ```bash
+   pip install fastapi uvicorn SQLAlchemy pydantic
+   ```
+
+2. **Run the FastAPI application:**
+   ```bash
+   python your_script_name.py
+   ```  (Replace `your_script_name.py` with the actual filename)
+
+3. **Access the API:**
+   * Open your web browser or use a tool like `curl` to access the API endpoints.  For example:
+     * `GET http://127.0.0.1:8000/tasks/` (list all tasks)
+     * `POST http://127.0.0.1:8000/tasks/` (create a new task – send JSON data in the request body)
+     * `GET http://127.0.0.1:8000/tasks/1` (get task with ID 1)
+     * `PUT http://127.0.0.1:8000/tasks/1` (update task with ID 1 – send JSON data in the request body)
+     * `DELETE http://127.0.0.1:8000/tasks/1` (delete task with ID 1)
+
+The FastAPI documentation will also be available at `http://127.0.0.1:8000/docs`.
